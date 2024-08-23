@@ -1,4 +1,4 @@
-datasetpath: "path"
+datasetpath: "/home/preston/Git/TriHorn-Net/data/NYU"
 model_name: hglass_2_1
 dataset: nyu
 cubic_size: 280
