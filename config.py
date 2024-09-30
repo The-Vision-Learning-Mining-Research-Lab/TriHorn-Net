@@ -4,6 +4,8 @@ import os
 
 def set_env():
     os.environ["NYU_PATH"] = str("data/NYU")
+    os.environ["ICVL_PATH"] = str("data/ICVL")
+    os.environ["MSRA_PATH"] = str("data/MSRA")
 
 
 def get_args_parser():
