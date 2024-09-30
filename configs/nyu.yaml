@@ -1,10 +1,10 @@
-datasetpath: "path"
+datasetpath: "PATH/data/NYU"
 model_name: hglass_2_1
 dataset: nyu
 cubic_size: 280
 subsetLength: -1
 
-num_epoch: 40
+num_epoch: 1
 batch_size: 32
 
 RotAugment: 1

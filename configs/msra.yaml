@@ -1,4 +1,4 @@
-datasetpath: "path"
+datasetpath: "PATH/data/MSRA"
 model_name: hglass_2_1
 dataset: msra
 cubic_size: 280

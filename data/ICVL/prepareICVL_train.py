@@ -15,26 +15,33 @@ import tqdm
 from scipy import stats, ndimage
 import sys
 
-def calculateCoM(dpt,minDepth=0,maxDepth=500):
-        """
-        Calculate the center of mass
-        :param dpt: depth image
-        :return: (x,y,z) center of mass
-        """
+# PWM Monkey patch for np float etc...
+np.float = float
+np.int = int  # module 'numpy' has no attribute 'int'
+np.object = object  # module 'numpy' has no attribute 'object'
+np.bool = bool  # module 'numpy' has no attribute 'bool'
 
-        dc = dpt.copy()
-        dc[dc < minDepth] = 0
-        dc[dc > maxDepth] = 0
-        cc = ndimage.measurements.center_of_mass(dc > 0)
-        num = np.count_nonzero(dc)
-        com = np.array((cc[1]*num, cc[0]*num, dc.sum()), np.float)
 
-        if num == 0:
-            return np.array((0, 0, 0), np.float)
-        else:
-            return com/num
-            
-            
+def calculateCoM(dpt, minDepth=0, maxDepth=500):
+    """
+    Calculate the center of mass
+    :param dpt: depth image
+    :return: (x,y,z) center of mass
+    """
+
+    dc = dpt.copy()
+    dc[dc < minDepth] = 0
+    dc[dc > maxDepth] = 0
+    cc = ndimage.measurements.center_of_mass(dc > 0)
+    num = np.count_nonzero(dc)
+    com = np.array((cc[1] * num, cc[0] * num, dc.sum()), np.float)
+
+    if num == 0:
+        return np.array((0, 0, 0), np.float)
+    else:
+        return com / num
+
+
 def transformPoint2D(pt, M):
     """
     Transform point in 2D coordinates
@@ -57,8 +64,8 @@ def transformPoints2D(pts, M):
     for i in range(pts.shape[0]):
         ret[i, 0:2] = transformPoint2D(pts[i, 0:2], M)
     return ret
-    
-    
+
+
 class HandDetector(object):
     """
     Detect hand based on simple heuristic, centered at Center of Mass
@@ -79,8 +86,8 @@ class HandDetector(object):
         self.maxDepth = min(1500, dpt.max())
         self.minDepth = max(10, dpt.min())
         # set values out of range to 0
-        self.dpt[self.dpt > self.maxDepth] = 0.
-        self.dpt[self.dpt < self.minDepth] = 0.
+        self.dpt[self.dpt > self.maxDepth] = 0.0
+        self.dpt[self.dpt < self.minDepth] = 0.0
         # camera settings
         self.fx = fx
         self.fy = fy
@@ -89,7 +96,6 @@ class HandDetector(object):
         self.importer = importer
         # depth resize method
         self.resizeMethod = self.RESIZE_CV2_NN
-
 
     def calculateCoM(self, dpt):
         """
@@ -103,12 +109,12 @@ class HandDetector(object):
         dc[dc > self.maxDepth] = 0
         cc = ndimage.measurements.center_of_mass(dc > 0)
         num = numpy.count_nonzero(dc)
-        com = numpy.array((cc[1]*num, cc[0]*num, dc.sum()), numpy.float)
+        com = numpy.array((cc[1] * num, cc[0] * num, dc.sum()), numpy.float)
 
         if num == 0:
             return numpy.array((0, 0, 0), numpy.float)
         else:
-            return com/num
+            return com / num
 
     def checkImage(self, tol):
         """
@@ -127,11 +133,13 @@ class HandDetector(object):
         Get value of not defined depth value distances
         :return:value of not defined depth value
         """
-        if self.dpt[self.dpt < self.minDepth].shape[0] > self.dpt[self.dpt > self.maxDepth].shape[0]:
+        if (
+            self.dpt[self.dpt < self.minDepth].shape[0]
+            > self.dpt[self.dpt > self.maxDepth].shape[0]
+        ):
             return stats.mode(self.dpt[self.dpt < self.minDepth])[0][0]
         else:
             return stats.mode(self.dpt[self.dpt > self.maxDepth])[0][0]
-
 
     def comToBounds(self, com, size):
         """
@@ -140,21 +148,37 @@ class HandDetector(object):
         :param size: (x,y,z) extent of the source crop volume in mm
         :return: xstart, xend, ystart, yend, zstart, zend
         """
-        if numpy.isclose(com[2], 0.):
-            print ("Warning: CoM ill-defined!")
-            xstart = self.dpt.shape[0]//4
-            xend = xstart + self.dpt.shape[0]//2
-            ystart = self.dpt.shape[1]//4
-            yend = ystart + self.dpt.shape[1]//2
+        if numpy.isclose(com[2], 0.0):
+            print("Warning: CoM ill-defined!")
+            xstart = self.dpt.shape[0] // 4
+            xend = xstart + self.dpt.shape[0] // 2
+            ystart = self.dpt.shape[1] // 4
+            yend = ystart + self.dpt.shape[1] // 2
             zstart = self.minDepth
             zend = self.maxDepth
         else:
-            zstart = com[2] - size[2] / 2.
-            zend = com[2] + size[2] / 2.
-            xstart = int(numpy.floor((com[0] * com[2] / self.fx - size[0] / 2.) / com[2]*self.fx+0.5))
-            xend = int(numpy.floor((com[0] * com[2] / self.fx + size[0] / 2.) / com[2]*self.fx+0.5))
-            ystart = int(numpy.floor((com[1] * com[2] / self.fy - size[1] / 2.) / com[2]*self.fy+0.5))
-            yend = int(numpy.floor((com[1] * com[2] / self.fy + size[1] / 2.) / com[2]*self.fy+0.5))
+            zstart = com[2] - size[2] / 2.0
+            zend = com[2] + size[2] / 2.0
+            xstart = int(
+                numpy.floor(
+                    (com[0] * com[2] / self.fx - size[0] / 2.0) / com[2] * self.fx + 0.5
+                )
+            )
+            xend = int(
+                numpy.floor(
+                    (com[0] * com[2] / self.fx + size[0] / 2.0) / com[2] * self.fx + 0.5
+                )
+            )
+            ystart = int(
+                numpy.floor(
+                    (com[1] * com[2] / self.fy - size[1] / 2.0) / com[2] * self.fy + 0.5
+                )
+            )
+            yend = int(
+                numpy.floor(
+                    (com[1] * com[2] / self.fy + size[1] / 2.0) / com[2] * self.fy + 0.5
+                )
+            )
         return xstart, xend, ystart, yend, zstart, zend
 
     def comToTransform(self, com, size, dsize=(128, 128)):
@@ -171,8 +195,8 @@ class HandDetector(object):
         trans[0, 2] = -xstart
         trans[1, 2] = -ystart
 
-        wb = (xend - xstart)
-        hb = (yend - ystart)
+        wb = xend - xstart
+        hb = yend - ystart
         if wb > hb:
             scale = numpy.eye(3) * dsize[0] / float(wb)
             sz = (dsize[0], hb * dsize[0] / wb)
@@ -181,15 +205,17 @@ class HandDetector(object):
             sz = (wb * dsize[1] / hb, dsize[1])
         scale[2, 2] = 1
 
-        xstart = int(numpy.floor(dsize[0] / 2. - sz[1] / 2.))
-        ystart = int(numpy.floor(dsize[1] / 2. - sz[0] / 2.))
+        xstart = int(numpy.floor(dsize[0] / 2.0 - sz[1] / 2.0))
+        ystart = int(numpy.floor(dsize[1] / 2.0 - sz[0] / 2.0))
         off = numpy.eye(3)
         off[0, 2] = xstart
         off[1, 2] = ystart
 
         return numpy.dot(off, numpy.dot(scale, trans))
 
-    def getCrop(self, dpt, xstart, xend, ystart, yend, zstart, zend, thresh_z=True, background=0):
+    def getCrop(
+        self, dpt, xstart, xend, ystart, yend, zstart, zend, thresh_z=True, background=0
+    ):
         """
         Crop patch from image
         :param dpt: depth image to crop from
@@ -203,20 +229,37 @@ class HandDetector(object):
         :return: cropped image
         """
         if len(dpt.shape) == 2:
-            cropped = dpt[max(ystart, 0):min(yend, dpt.shape[0]), max(xstart, 0):min(xend, dpt.shape[1])].copy()
+            cropped = dpt[
+                max(ystart, 0) : min(yend, dpt.shape[0]),
+                max(xstart, 0) : min(xend, dpt.shape[1]),
+            ].copy()
             # add pixels that are out of the image in order to keep aspect ratio
-            cropped = numpy.pad(cropped, ((abs(ystart)-max(ystart, 0),
-                                           abs(yend)-min(yend, dpt.shape[0])),
-                                          (abs(xstart)-max(xstart, 0),
-                                           abs(xend)-min(xend, dpt.shape[1]))), mode='constant', constant_values=background)
+            cropped = numpy.pad(
+                cropped,
+                (
+                    (abs(ystart) - max(ystart, 0), abs(yend) - min(yend, dpt.shape[0])),
+                    (abs(xstart) - max(xstart, 0), abs(xend) - min(xend, dpt.shape[1])),
+                ),
+                mode="constant",
+                constant_values=background,
+            )
         elif len(dpt.shape) == 3:
-            cropped = dpt[max(ystart, 0):min(yend, dpt.shape[0]), max(xstart, 0):min(xend, dpt.shape[1]), :].copy()
+            cropped = dpt[
+                max(ystart, 0) : min(yend, dpt.shape[0]),
+                max(xstart, 0) : min(xend, dpt.shape[1]),
+                :,
+            ].copy()
             # add pixels that are out of the image in order to keep aspect ratio
-            cropped = numpy.pad(cropped, ((abs(ystart)-max(ystart, 0),
-                                           abs(yend)-min(yend, dpt.shape[0])),
-                                          (abs(xstart)-max(xstart, 0),
-                                           abs(xend)-min(xend, dpt.shape[1])),
-                                          (0, 0)), mode='constant', constant_values=background)
+            cropped = numpy.pad(
+                cropped,
+                (
+                    (abs(ystart) - max(ystart, 0), abs(yend) - min(yend, dpt.shape[0])),
+                    (abs(xstart) - max(xstart, 0), abs(xend) - min(xend, dpt.shape[1])),
+                    (0, 0),
+                ),
+                mode="constant",
+                constant_values=background,
+            )
         else:
             raise NotImplementedError()
 
@@ -224,9 +267,8 @@ class HandDetector(object):
             msk1 = numpy.logical_and(cropped < zstart, cropped != 0)
             msk2 = numpy.logical_and(cropped > zend, cropped != 0)
             cropped[msk1] = zstart
-            cropped[msk2] = 0.  # backface is at 0, it is set later
+            cropped[msk2] = 0.0  # backface is at 0, it is set later
         return cropped
-
 
     def resizeCrop(self, crop, sz):
         """
@@ -245,8 +287,6 @@ class HandDetector(object):
             raise NotImplementedError("Unknown resize method!")
         return rz
 
-
-
     def cropArea3D(self, com=None, size=(250, 250, 250), dsize=(128, 128)):
         """
         Crop area of hand in 3D volumina, scales inverse to the distance of hand to camera
@@ -256,12 +296,12 @@ class HandDetector(object):
         :return: cropped hand image, transformation matrix for joints, CoM in image coordinates
         """
 
-        #print com, self.importer.jointImgTo3D(com)
-        #import matplotlib.pyplot as plt
-        #import matplotlib
-        #fig = plt.figure()
-        #ax = fig.add_subplot(111)
-        #ax.imshow(self.dpt, cmap=matplotlib.cm.jet)
+        # print com, self.importer.jointImgTo3D(com)
+        # import matplotlib.pyplot as plt
+        # import matplotlib
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111)
+        # ax.imshow(self.dpt, cmap=matplotlib.cm.jet)
 
         if len(size) != 3 or len(dsize) != 2:
             raise ValueError("Size must be 3D and dsize 2D bounding box")
@@ -271,15 +311,14 @@ class HandDetector(object):
 
         # calculate boundaries
         xstart, xend, ystart, yend, zstart, zend = self.comToBounds(com, size)
-        #print xstart-xend,ystart-yend
-
+        # print xstart-xend,ystart-yend
 
         # crop patch from source
         cropped = self.getCrop(self.dpt, xstart, xend, ystart, yend, zstart, zend)
-   
+
         #############
-        wb = (xend - xstart)
-        hb = (yend - ystart)
+        wb = xend - xstart
+        hb = yend - ystart
         if wb > hb:
             sz = (dsize[0], hb * dsize[0] / wb)
         else:
@@ -296,14 +335,17 @@ class HandDetector(object):
         scale[2, 2] = 1
 
         # depth resize
-        rz = self.resizeCrop(cropped, (np.int32(np.round(sz[0])),np.int32(np.round(sz[1]))))
+        rz = self.resizeCrop(
+            cropped, (np.int32(np.round(sz[0])), np.int32(np.round(sz[1])))
+        )
 
+        ret = (
+            numpy.ones(dsize, numpy.float32) * self.getNDValue()
+        )  # use background as filler
 
-        ret = numpy.ones(dsize, numpy.float32) * self.getNDValue()  # use background as filler
-
-        xstart = int(numpy.floor(dsize[0] / 2. - rz.shape[1] / 2.))
+        xstart = int(numpy.floor(dsize[0] / 2.0 - rz.shape[1] / 2.0))
         xend = int(xstart + rz.shape[1])
-        ystart = int(numpy.floor(dsize[1] / 2. - rz.shape[0] / 2.))
+        ystart = int(numpy.floor(dsize[1] / 2.0 - rz.shape[0] / 2.0))
         yend = int(ystart + rz.shape[0])
         ret[ystart:yend, xstart:xend] = rz
         # print rz.shape, xstart, ystart
@@ -312,7 +354,6 @@ class HandDetector(object):
         off[1, 2] = ystart
 
         return ret, numpy.dot(off, numpy.dot(scale, trans)), com
-
 
 
 class DepthImporter(object):
@@ -356,8 +397,8 @@ class DepthImporter(object):
         """
         ret = np.zeros((3,), np.float32)
         # convert to metric using f
-        ret[0] = (sample[0]-self.ux)*sample[2]/self.fx
-        ret[1] = (sample[1]-self.uy)*sample[2]/self.fy
+        ret[0] = (sample[0] - self.ux) * sample[2] / self.fx
+        ret[1] = (sample[1] - self.uy) * sample[2] / self.fy
         ret[2] = sample[2]
         return ret
 
@@ -380,12 +421,12 @@ class DepthImporter(object):
         """
         ret = np.zeros((3,), np.float32)
         # convert to metric using f
-        if sample[2] == 0.:
+        if sample[2] == 0.0:
             ret[0] = self.ux
             ret[1] = self.uy
             return ret
-        ret[0] = sample[0]/sample[2]*self.fx+self.ux
-        ret[1] = sample[1]/sample[2]*self.fy+self.uy
+        ret[0] = sample[0] / sample[2] * self.fx + self.ux
+        ret[1] = sample[1] / sample[2] * self.fy + self.uy
         ret[2] = sample[2]
         return ret
 
@@ -397,10 +438,10 @@ class DepthImporter(object):
         ret = np.zeros((4, 4), np.float32)
         ret[0, 0] = self.fx
         ret[1, 1] = self.fy
-        ret[2, 2] = 1.
+        ret[2, 2] = 1.0
         ret[0, 2] = self.ux
         ret[1, 2] = self.uy
-        ret[3, 2] = 1.
+        ret[3, 2] = 1.0
         return ret
 
     def getCameraIntrinsics(self):
@@ -411,7 +452,7 @@ class DepthImporter(object):
         ret = np.zeros((3, 3), np.float32)
         ret[0, 0] = self.fx
         ret[1, 1] = self.fy
-        ret[2, 2] = 1.
+        ret[2, 2] = 1.0
         ret[0, 2] = self.ux
         ret[1, 2] = self.uy
         return ret
@@ -422,25 +463,29 @@ class ICVLImporter(DepthImporter):
     provide functionality to load data from the ICVL dataset
     """
 
-    def __init__(self, basepath, useCache=True,refineNet=None):
+    def __init__(self, basepath, useCache=True, refineNet=None):
         """
         Constructor
         :param basepath: base path of the ICVL dataset
         :return:
         """
 
-        super(ICVLImporter, self).__init__(241.42, 241.42, 160., 120.)  # see Qian et.al.
+        super(ICVLImporter, self).__init__(
+            241.42, 241.42, 160.0, 120.0
+        )  # see Qian et.al.
 
         self.depth_map_size = (320, 240)
         self.basepath = basepath
         self.numJoints = 16
         self.crop_joint_idx = 0
         self.refineNet = refineNet
-        self.default_cubes = {'train': (250, 250, 250),
-                              'test': (250, 250, 250),
-                              'test_seq_2': (250, 250, 250)}
-        self.sides = {'train': 'right', 'test': 'right', 'test_seq_2': 'right'}
-        
+        self.default_cubes = {
+            "train": (250, 250, 250),
+            "test": (250, 250, 250),
+            "test_seq_2": (250, 250, 250),
+        }
+        self.sides = {"train": "right", "test": "right", "test_seq_2": "right"}
+
     def loadDepthMap(self, filename):
         """
         Read a depth-map
@@ -455,9 +500,17 @@ class ICVLImporter(DepthImporter):
 
         return imgdata
 
-    
-    
-    def loadSequence(self, seqName, subSeq=None, Nmax=float('inf'), shuffle=False, rng=None, docom=False, cube=None,hand=None):
+    def loadSequence(
+        self,
+        seqName,
+        subSeq=None,
+        Nmax=float("inf"),
+        shuffle=False,
+        rng=None,
+        docom=False,
+        cube=None,
+        hand=None,
+    ):
         """
         Load an image sequence from the dataset
         :param seqName: sequence name, e.g. train
@@ -470,27 +523,27 @@ class ICVLImporter(DepthImporter):
             raise TypeError("subSeq must be None or list")
 
         if cube is None:
-            config = {'cube': self.default_cubes[seqName]}
+            config = {"cube": self.default_cubes[seqName]}
         else:
             assert isinstance(cube, tuple)
             assert len(cube) == 3
-            config = {'cube': cube}
-
+            config = {"cube": cube}
 
         # Load the dataset
-        objdir = '{}/Depth/'.format(self.basepath)
-        trainlabels = '{}/labels.txt'.format(self.basepath)
-        
-        f=open("icvl_train_list.txt", "r")
-        ll=f.readlines()
-        for i in range(0,len(ll)-1):
-            ll[i]=ll[i][:-1]
-            
-            
+        objdir = "{}/Depth/".format(self.basepath)
+        trainlabels = "{}/labels.txt".format(self.basepath)
+
+        f = open("icvl_train_list.txt", "r")
+        ll = f.readlines()
+        for i in range(0, len(ll) - 1):
+            ll[i] = ll[i][:-1]
+
         inputfile = open(trainlabels)
 
-        txt = 'Loading {}'.format(seqName)
-        pbar = pb.ProgressBar(maxval=len(inputfile.readlines()), widgets=[txt, pb.Percentage(), pb.Bar()])
+        txt = "Loading {}".format(seqName)
+        pbar = pb.ProgressBar(
+            maxval=len(inputfile.readlines()), widgets=[txt, pb.Percentage(), pb.Bar()]
+        )
         pbar.start()
         inputfile.seek(0)
 
@@ -501,14 +554,13 @@ class ICVLImporter(DepthImporter):
             if len(data) >= Nmax:
                 break
 
-            part = line.split(' ')
+            part = line.split(" ")
             # check for subsequences and skip them if necessary
-            
+
             if part[0] not in ll:
                 continue
-           
-           
-            dptFileName = '{}/{}'.format(objdir, part[0])
+
+            dptFileName = "{}/{}".format(objdir, part[0])
 
             if not os.path.isfile(dptFileName):
                 print("File {} does not exist!".format(dptFileName))
@@ -520,12 +572,11 @@ class ICVLImporter(DepthImporter):
             gtorig = numpy.zeros((self.numJoints, 3), numpy.float32)
             for joint in range(self.numJoints):
                 for xyz in range(0, 3):
-                    gtorig[joint, xyz] = part[joint*3+xyz+1]
- 
+                    gtorig[joint, xyz] = part[joint * 3 + xyz + 1]
+
             # normalized joints in 3D coordinates
             gt3Dorig = self.jointsImgTo3D(gtorig)
 
-           
             data.append([dpt, gtorig, gt3Dorig, dptFileName])
             pbar.update(i)
             i += 1
@@ -541,41 +592,19 @@ class ICVLImporter(DepthImporter):
 
 
 #######################################################
-adress=sys.argv[1]
-dataset=ICVLImporter(basepath=adress)
-data=dataset.loadSequence("train")
+adress = sys.argv[1]
+dataset = ICVLImporter(basepath=adress)
+data = dataset.loadSequence("train")
 
 
-q1=[]
+q1 = []
 for d in tqdm.tqdm(data):
     q1.append(calculateCoM(d[0].copy()))
-    
-q1=np.stack(q1)
+
+q1 = np.stack(q1)
 
 
-dd=(data,q1)
+dd = (data, q1)
 
-with open('train.pickle', 'wb') as f:
+with open("train.pickle", "wb") as f:
     pickle.dump(dd, f)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
