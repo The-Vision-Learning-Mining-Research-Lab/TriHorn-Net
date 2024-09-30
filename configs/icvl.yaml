@@ -1,4 +1,4 @@
-datasetpath: "/home/preston/Git/Forked/TriHorn-Net/data/ICVL"
+datasetpath: "PATH/data/ICVL"
 model_name: hglass_2_1
 dataset: icvl
 cubic_size: 280
